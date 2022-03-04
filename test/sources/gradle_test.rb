@@ -51,41 +51,82 @@ describe Licensed::Sources::Gradle do
 end
 
 describe Licensed::Sources::Gradle::Dependency do
-  let(:fixtures) { File.expand_path("../../fixtures/gradle", __FILE__) }
   let(:config) { Licensed::AppConfiguration.new({ "source_path" => Dir.pwd }) }
   let(:source) { Licensed::Sources::Gradle.new(config) }
 
-  it "returns the dependency license" do
-    Dir.chdir fixtures do
-      dep = source.dependencies.detect { |d| d.name == "io.netty:netty-all" }
-      assert dep
-      assert_equal "apache-2.0", dep.license.key
+  context "with a simple gradle project" do
+    let(:fixtures) { File.expand_path("../../fixtures/gradle/simple", __FILE__) }
 
-      license = dep.record.licenses.find { |l| l.text =~ /Apache License/ }
-      assert license
-      assert_equal ["https://www.apache.org/licenses/LICENSE-2.0"], license.sources
+    it "returns the dependency license" do
+      Dir.chdir fixtures do
+        dep = source.dependencies.detect { |d| d.name == "io.netty:netty-all" }
+        assert dep
+        assert_equal "apache-2.0", dep.license.key
+
+        license = dep.record.licenses.find { |l| l.text =~ /Apache License/ }
+        assert license
+        assert_equal ["https://www.apache.org/licenses/LICENSE-2.0"], license.sources
+      end
+    end
+
+    it "cleans up grade licenses csv content" do
+      Dir.chdir fixtures do
+        dep = source.dependencies.detect { |d| d.name == "io.netty:netty-all" }
+        # load the dependency record, pulling license files
+        dep.record
+
+        refute Pathname.pwd.join(Licensed::Sources::Gradle::GRADLE_LICENSES_PATH).exist?
+      end
+    end
+
+    it "does not make any network requests when accessing non-license data" do
+      Licensed::Sources::Gradle::Dependency.expects(:retrieve_license).never
+      Licensed::Sources::Gradle::Dependency.expects(:load_csv).never
+
+      Dir.chdir fixtures do
+        dep = source.dependencies.detect { |d| d.name == "io.netty:netty-all" }
+        # accessing non-license dependency data does not make network requests
+        dep.name
+        dep.version
+      end
     end
   end
 
-  it "cleans up grade licenses csv content" do
-    Dir.chdir fixtures do
-      dep = source.dependencies.detect { |d| d.name == "io.netty:netty-all" }
-      # load the dependency record, pulling license files
-      dep.record
+  context "with a gradle multi-project" do
+    let(:fixtures) { File.expand_path("../../fixtures/gradle/multi-project", __FILE__) }
 
-      refute Pathname.pwd.join(Licensed::Sources::Gradle::GRADLE_LICENSES_PATH).exist?
+    it "returns the dependency license" do
+      Dir.chdir fixtures do
+        dep = source.dependencies.detect { |d| d.name == "io.netty:netty-all" }
+        assert dep
+        assert_equal "apache-2.0", dep.license.key
+
+        license = dep.record.licenses.find { |l| l.text =~ /Apache License/ }
+        assert license
+        assert_equal ["https://www.apache.org/licenses/LICENSE-2.0"], license.sources
+      end
     end
-  end
 
-  it "does not make any network requests when accessing non-license data" do
-    Licensed::Sources::Gradle::Dependency.expects(:retrieve_license).never
-    Licensed::Sources::Gradle::Dependency.expects(:load_csv).never
+    it "cleans up grade licenses csv content" do
+      Dir.chdir fixtures do
+        dep = source.dependencies.detect { |d| d.name == "io.netty:netty-all" }
+        # load the dependency record, pulling license files
+        dep.record
 
-    Dir.chdir fixtures do
-      dep = source.dependencies.detect { |d| d.name == "io.netty:netty-all" }
-      # accessing non-license dependency data does not make network requests
-      dep.name
-      dep.version
+        refute Pathname.pwd.join(Licensed::Sources::Gradle::GRADLE_LICENSES_PATH).exist?
+      end
+    end
+
+    it "does not make any network requests when accessing non-license data" do
+      Licensed::Sources::Gradle::Dependency.expects(:retrieve_license).never
+      Licensed::Sources::Gradle::Dependency.expects(:load_csv).never
+
+      Dir.chdir fixtures do
+        dep = source.dependencies.detect { |d| d.name == "io.netty:netty-all" }
+        # accessing non-license dependency data does not make network requests
+        dep.name
+        dep.version
+      end
     end
   end
 end
